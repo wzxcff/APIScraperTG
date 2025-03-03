@@ -1,8 +1,8 @@
 import os
 import json
+import asyncio
 from dotenv import load_dotenv
-from telethon.sync import TelegramClient
-from telethon.tl.types import Channel, Chat
+from telethon import TelegramClient
 
 
 def dump_json(messages):
@@ -20,58 +20,69 @@ class Scrapper:
 
     async def connect(self):
         await self.client.start()
-        if not self.client.is_connected():
-            print("Client cannot connect!")
 
     async def close(self):
         await self.client.disconnect()
-        print("Client disconnected!")
 
     async def run(self):
         await self.connect()
-        print(await self.get_messages())
-        print(await self.get_members())
+        messages = await self.get_messages()
+        dump_json(messages)
         await self.close()
 
     async def get_messages(self):
         messages = []
+        avatar_folder = f"avatars/{self.target}"
+        os.makedirs(avatar_folder, exist_ok=True)
+
         async for message in self.client.iter_messages(self.target, limit=10):
+            sender_id = message.from_id.user_id if message.from_id else None
             msg_data = {
                 'id': message.id,
-                'sender': message.sender_id,
+                'sender_id': sender_id,
                 'text': message.text,
                 'date': message.date.isoformat(),
             }
+
+            if sender_id:
+                try:
+                    sender = await self.client.get_entity(sender_id)
+                    msg_data['sender_name'] = sender.first_name if sender.first_name else "No name"
+                    msg_data['sender_username'] = sender.username if sender.username else None
+
+                    avatar_path = os.path.join(avatar_folder, f"{sender_id}_{sender.first_name}.jpg")
+                    if sender.photo and not os.path.exists(avatar_path):
+                        await self.client.download_profile_photo(sender, file=avatar_path)
+
+                    msg_data['sender_avatar'] = avatar_path if os.path.exists(avatar_path) else None
+                except Exception as e:
+                    msg_data['sender_name'] = "Cannot fetch info"
+                    msg_data['error'] = str(e)
+            else:
+                msg_data['sender_name'] = "Unknown sender"
+                msg_data['sender_username'] = None
+                msg_data['sender_avatar'] = None
+
             if message.media:
                 file_path = await message.download_media(file=f"media/{self.target}/{message.date}.jpg")
-                msg_data['media'] = file_path if file_path else "Failed to download"
+                msg_data['media'] = file_path if file_path else None
 
             messages.append(msg_data)
-
         return messages
 
-    async def get_members(self):
-        entity = await self.client.get_entity(self.target)
 
-        if isinstance(entity, Channel):
-            if entity.megagroup:
-                return await self.client.get_participants(self.target)
-            else:
-                user = await self.client.get_me()
-                permissions = await self.client.get_permissions(self.target, user.id)
-                if permissions.is_admin or permissions.is_creator:
-                    return await self.client.get_participants(self.target)
-                else:
-                    print("Cannot fetch members in a private channel. You're not an admin.")
-                    return []
-        elif isinstance(entity, Chat):
-            return await self.client.get_participants(self.target)
+async def main():
+    target_username = input("Введите @username группы или канала: ")
+    scrapper = Scrapper(target_username)
+    await scrapper.run()
 
 
 if __name__ == "__main__":
-    target_username = input("Enter target channel or group username (e.g., @channel_name): ")
-    scrapper = Scrapper(target_username)
-
-    import asyncio
-
-    asyncio.run(scrapper.run())
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        loop.run_until_complete(main())
+    except KeyboardInterrupt:
+        pass
+    finally:
+        loop.close()
