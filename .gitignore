@@ -21,3 +21,6 @@ coverage.xml
 .pytest_cache/
 cover/
 *.env
+*.session
+*.json
+test.py
