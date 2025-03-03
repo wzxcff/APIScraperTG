@@ -24,3 +24,4 @@ cover/
 *.session
 *.json
 test.py
+media/*
