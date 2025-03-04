@@ -3,7 +3,8 @@ import json
 import asyncio
 from dotenv import load_dotenv
 from telethon import TelegramClient
-from telethon.tl.types import Channel, Chat
+from telethon.tl.types import Channel, Chat, MessageMediaPhoto, MessageMediaDocument
+import mimetypes
 
 
 def dump_json(data, filename):
@@ -34,11 +35,15 @@ class Scrapper:
         await self.close()
 
     async def get_messages(self):
+        print("Started fetching messages..")
         messages = []
         avatar_folder = f"avatars/{self.target}"
         os.makedirs(avatar_folder, exist_ok=True)
+        count = 0
 
         async for message in self.client.iter_messages(self.target, limit=10):
+            count += 1
+            print(f"Message #{count} – fetching data")
             sender_id = message.from_id.user_id if message.from_id else None
             msg_data = {
                 'id': message.id,
@@ -71,8 +76,20 @@ class Scrapper:
             msg_data['sender'] = sender_dict
 
             if message.media:
-                file_path = await message.download_media(file=f"media/{self.target}/{message.date}_{message.id}.jpg")
-                msg_data['media'] = file_path if file_path else None
+                print(f"Message #{count} – Media found. Trying to save it.")
+                if isinstance(message.media, MessageMediaPhoto):
+                    file_path = await message.download_media(file=f"media/{self.target}/{message.date}_{message.id}.jpg")
+                    msg_data['media'] = file_path if file_path else None
+                elif isinstance(message.media, MessageMediaDocument):
+                    try:
+                        guessed_mime = mimetypes.guess_extension(message.media.document.mime_type)
+                        print(f"Message #{count} – guessed mime: {guessed_mime}")
+                        file_path = await message.download_media(file=f"media/{self.target}/{message.date}_{message.id}{guessed_mime}")
+                    except Exception as e:
+                        file_path = await message.download_media(file=f"media/{self.target}/{message.date}_{message.id}.file")
+                        print(f"Message #{count} – Error occurred during guessing mime type extension: {e}")
+                    msg_data['media'] = file_path if file_path else None
+                print("Media was saved successfully\n")
 
             messages.append(msg_data)
         return {"target": self.target, "messages": messages}
