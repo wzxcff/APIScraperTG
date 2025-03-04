@@ -100,12 +100,22 @@ class Scrapper:
 
         if users:
             for user in users:
+                user_entity = await self.client.get_entity(user)
+
+                os.makedirs(f"participants_avatars/{self.target}", exist_ok=True)
+                participant_path = f"participants_avatars/{self.target}/{user.id}_{user.first_name}.jpg"
+
                 user_data = {
                     'user_id': user.id,
                     'username': user.username,
                     'first_name': user.first_name,
                     'last_name': user.last_name,
                 }
+
+                if user.photo and not os.path.exists(participant_path):
+                    await self.client.download_profile_photo(user_entity, file=participant_path)
+
+                user_data['avatar'] = participant_path if os.path.exists(participant_path) else None
                 users_list.append(user_data)
 
         users_dict["participants"] = users_list

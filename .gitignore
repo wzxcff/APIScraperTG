@@ -26,3 +26,4 @@ cover/
 test.py
 media/*
 avatars/*
+participants_avatars/*
