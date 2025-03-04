@@ -71,7 +71,7 @@ class Scrapper:
             msg_data['sender'] = sender_dict
 
             if message.media:
-                file_path = await message.download_media(file=f"media/{self.target}/{message.date}.jpg")
+                file_path = await message.download_media(file=f"media/{self.target}/{message.date}_{message.id}.jpg")
                 msg_data['media'] = file_path if file_path else None
 
             messages.append(msg_data)
@@ -92,7 +92,7 @@ class Scrapper:
                 if permissions.is_admin or permissions.is_creator:
                     users = await self.client.get_participants(self.target)
                 else:
-                    print("Cannot fetch members in a private channel. You're not an admin.")
+                    print("Cannot fetch members. You're not an admin.")
         elif isinstance(entity, Chat):
             users = await self.client.get_participants(self.target)
         else:
