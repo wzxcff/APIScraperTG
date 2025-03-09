@@ -24,6 +24,3 @@ cover/
 *.session
 *.json
 test.py
-media/*
-avatars/*
-participants_avatars/*

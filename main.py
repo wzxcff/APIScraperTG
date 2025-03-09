@@ -29,21 +29,31 @@ class Scrapper:
     async def run(self):
         await self.connect()
         messages = await self.get_messages()
-        dump_json(messages, "messages")
+        dump_json(messages, f"{self.target}/jsons/messages")
         participants = await self.get_members()
-        dump_json(participants, "participants")
+        dump_json(participants, f"{self.target}/jsons/participants")
         await self.close()
 
     async def get_messages(self):
         print("Started fetching messages..")
         messages = []
-        avatar_folder = f"avatars/{self.target}"
+        avatar_folder = f"{self.target}/avatars"
+        target_folder = f"{self.target}"
+        participants_avatars_folder = f"{target_folder}/participants_avatars"
+        media_folder = f"{target_folder}/media"
+        jsons_folder = f"{target_folder}/jsons"
+        os.makedirs(target_folder, exist_ok=True)
         os.makedirs(avatar_folder, exist_ok=True)
+        os.makedirs(participants_avatars_folder, exist_ok=True)
+        os.makedirs(media_folder, exist_ok=True)
+        os.makedirs(jsons_folder, exist_ok=True)
+
         count = 0
+        comments = []
 
         async for message in self.client.iter_messages(self.target, limit=10):
             count += 1
-            print(f"Message #{count} – fetching data")
+            print(f"\nMessage #{count} – fetching data")
             sender_id = message.from_id.user_id if message.from_id else None
             msg_data = {
                 'id': message.id,
@@ -75,19 +85,36 @@ class Scrapper:
                 sender_dict['avatar'] = None
             msg_data['sender'] = sender_dict
 
+            print("Searching for replies to message..")
+            if message.replies:
+                print("Found replies, trying to fetch them.")
+                async for comment in self.client.iter_messages(self.target, reply_to=message.id):
+                    comment_data = {
+                        'id': comment.id,
+                        'text': comment.text,
+                        'date': comment.date.isoformat(),
+                        'sender_id': comment.from_id.user_id if comment.from_id else None
+                    }
+                    comments.append(comment_data)
+
+                    if comments:
+                        msg_data['comments'] = comments
+            else:
+                print("No replies found for message.")
+
             if message.media:
-                print(f"Message #{count} – Media found. Trying to save it.")
+                print(f"Media found. Trying to save it.")
                 if isinstance(message.media, MessageMediaPhoto):
-                    file_path = await message.download_media(file=f"media/{self.target}/{message.date}_{message.id}.jpg")
+                    file_path = await message.download_media(file=f"{self.target}/media/{message.date}_{message.id}.jpg")
                     msg_data['media'] = file_path if file_path else None
                 elif isinstance(message.media, MessageMediaDocument):
                     try:
                         guessed_mime = mimetypes.guess_extension(message.media.document.mime_type)
-                        print(f"Message #{count} – guessed mime: {guessed_mime}")
-                        file_path = await message.download_media(file=f"media/{self.target}/{message.date}_{message.id}{guessed_mime}")
+                        print(f"Guessed mime: {guessed_mime}")
+                        file_path = await message.download_media(file=f"{self.target}/media/{message.date}_{message.id}{guessed_mime}")
                     except Exception as e:
-                        file_path = await message.download_media(file=f"media/{self.target}/{message.date}_{message.id}.file")
-                        print(f"Message #{count} – Error occurred during guessing mime type extension: {e}")
+                        file_path = await message.download_media(file=f"{self.target}/media/{message.date}_{message.id}.file")
+                        print(f"[ERROR] Error occurred during guessing mime type extension: {e}")
                     msg_data['media'] = file_path if file_path else None
                 print("Media was saved successfully\n")
 
