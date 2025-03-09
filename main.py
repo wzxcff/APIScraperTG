@@ -47,6 +47,24 @@ class Scrapper:
         os.makedirs(self.media_folder, exist_ok=True)
         os.makedirs(self.jsons_folder, exist_ok=True)
 
+    async def get_chat_type(self):
+        entity = await self.client.get_entity(self.target)
+
+        if isinstance(entity, Channel):
+            if entity.megagroup:
+                return "Mega group"
+            else:
+                user = await self.client.get_me()
+                permissions = await self.client.get_permissions(self.target, user.id)
+                if permissions.is_admin or permissions.is_creator:
+                    return "Channel admin"
+                else:
+                    return "Channel user"
+        elif isinstance(entity, Chat):
+            return "Chat group"
+        else:
+            return "Unknown"
+
     async def get_messages(self):
         print("Started fetching messages..")
         messages = []
@@ -89,7 +107,7 @@ class Scrapper:
             msg_data['sender'] = sender_dict
 
             print("Searching for replies to message..")
-            if message.replies:
+            if message.replies and await self.get_chat_type() in ["Channel admin", "Channel user"]:
                 print("Found replies, trying to fetch them.")
                 async for comment in self.client.iter_messages(self.target, reply_to=message.id):
                     comment_data = {
@@ -125,25 +143,22 @@ class Scrapper:
         return {"target": self.target, "messages": messages}
 
     async def get_members(self):
-        entity = await self.client.get_entity(self.target)
         users = []
         users_dict = {"target": self.target}
         users_list = []
 
-        if isinstance(entity, Channel):
-            if entity.megagroup:
-                users = await self.client.get_participants(self.target)
-            else:
-                user = await self.client.get_me()
-                permissions = await self.client.get_permissions(self.target, user.id)
-                if permissions.is_admin or permissions.is_creator:
-                    users = await self.client.get_participants(self.target)
-                else:
-                    print("Cannot fetch members. You're not an admin.")
-        elif isinstance(entity, Chat):
+        chat_type = await self.get_chat_type()
+
+        if chat_type == "Mega group":
+            users = await self.client.get_participants(self.target)
+        elif chat_type == "Channel admin":
+            users = await self.client.get_participants(self.target)
+        elif chat_type == "Channel user":
+            print("Cannot fetch members. You're not an admin.")
+        elif chat_type == "Chat group":
             users = await self.client.get_participants(self.target)
         else:
-            print("Unknown entity type")
+            print("Cannot fetch members. Unknown chat_type.")
 
         if users:
             for user in users:
