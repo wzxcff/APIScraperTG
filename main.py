@@ -20,6 +20,12 @@ class Scrapper:
         self.target = target_channel
         self.client = TelegramClient("session_name", self.api_id, self.api_hash)
 
+        self.avatar_folder = f"{self.target}/avatars"
+        self.target_folder = f"{self.target}"
+        self.participants_avatars_folder = f"{self.target_folder}/participants_avatars"
+        self.media_folder = f"{self.target_folder}/media"
+        self.jsons_folder = f"{self.target_folder}/jsons"
+
     async def connect(self):
         await self.client.start()
 
@@ -28,25 +34,22 @@ class Scrapper:
 
     async def run(self):
         await self.connect()
+        await self.create_dirs()
         messages = await self.get_messages()
         dump_json(messages, f"{self.target}/jsons/messages")
         participants = await self.get_members()
         dump_json(participants, f"{self.target}/jsons/participants")
         await self.close()
 
+    async def create_dirs(self):
+        os.makedirs(self.avatar_folder, exist_ok=True)
+        os.makedirs(self.participants_avatars_folder, exist_ok=True)
+        os.makedirs(self.media_folder, exist_ok=True)
+        os.makedirs(self.jsons_folder, exist_ok=True)
+
     async def get_messages(self):
         print("Started fetching messages..")
         messages = []
-        avatar_folder = f"{self.target}/avatars"
-        target_folder = f"{self.target}"
-        participants_avatars_folder = f"{target_folder}/participants_avatars"
-        media_folder = f"{target_folder}/media"
-        jsons_folder = f"{target_folder}/jsons"
-        os.makedirs(target_folder, exist_ok=True)
-        os.makedirs(avatar_folder, exist_ok=True)
-        os.makedirs(participants_avatars_folder, exist_ok=True)
-        os.makedirs(media_folder, exist_ok=True)
-        os.makedirs(jsons_folder, exist_ok=True)
 
         count = 0
         comments = []
@@ -70,7 +73,7 @@ class Scrapper:
                     sender_dict['last_name'] = sender.last_name if sender.last_name else None
                     sender_dict['username'] = sender.username if sender.username else None
 
-                    avatar_path = os.path.join(avatar_folder, f"{sender_id}_{sender.first_name}.jpg")
+                    avatar_path = os.path.join(self.avatar_folder, f"{sender_id}_{sender.first_name}.jpg")
                     if sender.photo and not os.path.exists(avatar_path):
                         await self.client.download_profile_photo(sender, file=avatar_path)
 
@@ -93,7 +96,7 @@ class Scrapper:
                         'id': comment.id,
                         'text': comment.text,
                         'date': comment.date.isoformat(),
-                        'sender_id': comment.from_id.user_id if comment.from_id else None
+                        'user_id': comment.from_id.user_id if comment.from_id else None
                     }
                     comments.append(comment_data)
 
@@ -146,8 +149,7 @@ class Scrapper:
             for user in users:
                 user_entity = await self.client.get_entity(user)
 
-                os.makedirs(f"participants_avatars/{self.target}", exist_ok=True)
-                participant_path = f"participants_avatars/{self.target}/{user.id}_{user.first_name}.jpg"
+                participant_path = self.participants_avatars_folder + f"/{user.id}_{user.first_name}.jpg"
 
                 user_data = {
                     'user_id': user.id,
