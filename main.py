@@ -3,6 +3,7 @@ import json
 import asyncio
 from dotenv import load_dotenv
 from telethon import TelegramClient
+from telethon.errors import UserNotParticipantError
 from telethon.tl.types import Channel, Chat, MessageMediaPhoto, MessageMediaDocument
 import mimetypes
 
@@ -55,7 +56,11 @@ class Scrapper:
                 return "Mega group"
             else:
                 user = await self.client.get_me()
-                permissions = await self.client.get_permissions(self.target, user.id)
+                try:
+                    permissions = await self.client.get_permissions(self.target, user.id)
+                except UserNotParticipantError:
+                    print("User not participant")
+                    return "User not participant"
                 if permissions.is_admin or permissions.is_creator:
                     return "Channel admin"
                 else:
@@ -125,16 +130,19 @@ class Scrapper:
 
             if message.media:
                 print(f"Media found. Trying to save it.")
+
+                formatted_date = message.date.strftime("%Y-%m-%d_%H-%M-%S")
+
                 if isinstance(message.media, MessageMediaPhoto):
-                    file_path = await message.download_media(file=f"{self.target}/media/{message.date}_{message.id}.jpg")
+                    file_path = await message.download_media(file=f"{self.target}/media/{formatted_date}_{message.id}.jpg")
                     msg_data['media'] = file_path if file_path else None
                 elif isinstance(message.media, MessageMediaDocument):
                     try:
                         guessed_mime = mimetypes.guess_extension(message.media.document.mime_type)
                         print(f"Guessed mime: {guessed_mime}")
-                        file_path = await message.download_media(file=f"{self.target}/media/{message.date}_{message.id}{guessed_mime}")
+                        file_path = await message.download_media(file=f"{self.target}/media/{formatted_date}_{message.id}{guessed_mime}")
                     except Exception as e:
-                        file_path = await message.download_media(file=f"{self.target}/media/{message.date}_{message.id}.file")
+                        file_path = await message.download_media(file=f"{self.target}/media/{formatted_date}_{message.id}.file")
                         print(f"[ERROR] Error occurred during guessing mime type extension: {e}")
                     msg_data['media'] = file_path if file_path else None
                 print("Media was saved successfully\n")
