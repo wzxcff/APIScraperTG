@@ -15,21 +15,6 @@ def dump_json(data, filename):
         json.dump(data, f, ensure_ascii=False, indent=4)
 
 
-async def fetch_target_info(client, target_channel):
-    res = {"target": target_channel}
-    channel_info = await client(GetFullChannelRequest(channel=target_channel))
-
-    full_chat = channel_info.full_chat
-
-    res["participants_count"] = full_chat.participants_count if full_chat.participants_count else "-"
-    res["admins_count"] = full_chat.admins_count if full_chat.admins_count else "-"
-    res["kicked_count"] = full_chat.kicked_count if full_chat.kicked_count else "-"
-    res["banned_count"] = full_chat.banned_count if full_chat.banned_count else "-"
-    res["online_count"] = full_chat.online_count if full_chat.online_count else "-"
-    res["requested_at"] = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    return res
-
-
 class Scrapper:
     def __init__(self, target_channel):
         load_dotenv()
@@ -57,8 +42,29 @@ class Scrapper:
         dump_json(messages, f"{self.target}/jsons/messages")
         participants = await self.get_members()
         dump_json(participants, f"{self.target}/jsons/participants")
-        await fetch_target_info(self.client, self.target)
+        await self.fetch_target_info()
         await self.close()
+
+    async def fetch_target_info(self):
+        channel_info = await self.client(GetFullChannelRequest(channel=self.target))
+        full_chat = channel_info.full_chat
+
+        res = {"username": self.target, "title": channel_info.chats[0].title, "about": full_chat.about}
+
+        avatar_path = os.path.join(self.avatar_folder, f"{self.target}_avatar.jpg")
+
+        if full_chat.chat_photo:
+            profile_photos = await self.client.get_profile_photos(self.target)
+            if profile_photos:
+                await self.client.download_media(profile_photos[0], file=avatar_path)
+        res["avatar"] = avatar_path if os.path.exists(avatar_path) else None
+        res["participants_count"] = full_chat.participants_count if full_chat.participants_count else "-"
+        res["admins_count"] = full_chat.admins_count if full_chat.admins_count else "-"
+        res["kicked_count"] = full_chat.kicked_count if full_chat.kicked_count else "-"
+        res["banned_count"] = full_chat.banned_count if full_chat.banned_count else "-"
+        res["online_count"] = full_chat.online_count if full_chat.online_count else "-"
+        res["requested_at"] = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        return res
 
     async def create_dirs(self):
         os.makedirs(self.avatar_folder, exist_ok=True)
@@ -103,6 +109,7 @@ class Scrapper:
                 'id': message.id,
                 'text': message.text,
                 'date': message.date.isoformat(),
+                'changed_at': message.edit_date.isoformat() if message.edit_date and message.edit_date != message.date else None
             }
 
             sender_dict = {}
@@ -166,9 +173,8 @@ class Scrapper:
                 print("Media was saved successfully\n")
 
             messages.append(msg_data)
-        info = await fetch_target_info(self.client, self.target)
-        info["messages"] = messages
-        return info
+        res = {"target": await self.fetch_target_info(), "messages": messages}
+        return res
 
     async def get_members(self):
         users = []
