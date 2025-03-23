@@ -49,7 +49,7 @@ class Scrapper:
         channel_info = await self.client(GetFullChannelRequest(channel=self.target))
         full_chat = channel_info.full_chat
 
-        res = {"username": self.target, "title": channel_info.chats[0].title, "about": full_chat.about}
+        res = {"id": full_chat.id, "username": self.target, "title": channel_info.chats[0].title, "about": full_chat.about}
 
         avatar_path = os.path.join(self.avatar_folder, f"{self.target}_avatar.jpg")
 
@@ -144,6 +144,7 @@ class Scrapper:
                         'id': comment.id,
                         'text': comment.text,
                         'date': comment.date.isoformat(),
+                        'changed_at': comment.edit_date.isoformat() if comment.edit_date and comment.edit_date != comment.date else None,
                         'user_id': comment.from_id.user_id if comment.from_id else None
                     }
                     comments.append(comment_data)
