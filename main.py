@@ -1,9 +1,11 @@
 import os
 import json
 import asyncio
+from datetime import datetime
 from dotenv import load_dotenv
 from telethon import TelegramClient
 from telethon.errors import UserNotParticipantError
+from telethon.tl.functions.channels import GetFullChannelRequest
 from telethon.tl.types import Channel, Chat, MessageMediaPhoto, MessageMediaDocument
 import mimetypes
 
@@ -11,6 +13,21 @@ import mimetypes
 def dump_json(data, filename):
     with open(f'{filename}.json', 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
+
+
+async def fetch_target_info(client, target_channel):
+    res = {"target": target_channel}
+    channel_info = await client(GetFullChannelRequest(channel=target_channel))
+
+    full_chat = channel_info.full_chat
+
+    res["participants_count"] = full_chat.participants_count if full_chat.participants_count else "-"
+    res["admins_count"] = full_chat.admins_count if full_chat.admins_count else "-"
+    res["kicked_count"] = full_chat.kicked_count if full_chat.kicked_count else "-"
+    res["banned_count"] = full_chat.banned_count if full_chat.banned_count else "-"
+    res["online_count"] = full_chat.online_count if full_chat.online_count else "-"
+    res["requested_at"] = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    return res
 
 
 class Scrapper:
@@ -40,6 +57,7 @@ class Scrapper:
         dump_json(messages, f"{self.target}/jsons/messages")
         participants = await self.get_members()
         dump_json(participants, f"{self.target}/jsons/participants")
+        await fetch_target_info(self.client, self.target)
         await self.close()
 
     async def create_dirs(self):
@@ -148,7 +166,9 @@ class Scrapper:
                 print("Media was saved successfully\n")
 
             messages.append(msg_data)
-        return {"target": self.target, "messages": messages}
+        info = await fetch_target_info(self.client, self.target)
+        info["messages"] = messages
+        return info
 
     async def get_members(self):
         users = []
