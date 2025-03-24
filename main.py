@@ -156,6 +156,7 @@ class Scrapper:
                         await self.client.download_profile_photo(sender, file=avatar_path)
 
                     sender_dict['avatar'] = avatar_path if os.path.exists(avatar_path) else None
+                    sender_dict['is_bot'] = True if sender.bot else False
                 except Exception as e:
                     sender_dict['name'] = "Cannot fetch info"
                     msg_data['error'] = str(e)
