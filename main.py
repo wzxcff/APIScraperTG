@@ -43,7 +43,37 @@ class Scrapper:
         participants = await self.get_members()
         dump_json(participants, f"{self.target}/jsons/participants")
         await self.fetch_target_info()
+        logs = await self.get_admin_log()
+        dump_json(logs, f"{self.target}/jsons/logs")
         await self.close()
+
+    async def get_admin_log(self):
+        logs = []
+
+        if await self.get_chat_type() in ["Channel admin"]:
+            async for action in self.client.iter_admin_log(self.target):
+                log_entry = {
+                    "action": str(action.action),
+                    "performed_by": {
+                        "user_id": action.user_id,
+                        "first_name": None,
+                        "last_name": None,
+                        "username": None
+                    },
+                    "timestamp": action.date.isoformat(),
+                }
+
+                try:
+                    user = await self.client.get_entity(action.user_id)
+                    log_entry["performed_by"]["first_name"] = user.first_name
+                    log_entry["performed_by"]["username"] = user.username
+                except Exception as e:
+                    log_entry["performed_by"]["first_name"] = "Unknown"
+                    log_entry["performed_by"]["username"] = None
+                    log_entry["error"] = str(e)
+
+                logs.append(log_entry)
+        return logs
 
     async def fetch_target_info(self):
         channel_info = await self.client(GetFullChannelRequest(channel=self.target))
@@ -63,7 +93,7 @@ class Scrapper:
         res["kicked_count"] = full_chat.kicked_count if full_chat.kicked_count else "-"
         res["banned_count"] = full_chat.banned_count if full_chat.banned_count else "-"
         res["online_count"] = full_chat.online_count if full_chat.online_count else "-"
-        res["requested_at"] = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        res["requested_at"] = datetime.now().isoformat()
         return res
 
     async def create_dirs(self):
@@ -184,14 +214,10 @@ class Scrapper:
 
         chat_type = await self.get_chat_type()
 
-        if chat_type == "Mega group":
-            users = await self.client.get_participants(self.target)
-        elif chat_type == "Channel admin":
+        if chat_type in ["Mega group", "Channel admin", "Chat group"]:
             users = await self.client.get_participants(self.target)
         elif chat_type == "Channel user":
             print("Cannot fetch members. You're not an admin.")
-        elif chat_type == "Chat group":
-            users = await self.client.get_participants(self.target)
         else:
             print("Cannot fetch members. Unknown chat_type.")
 
