@@ -6,7 +6,9 @@ from dotenv import load_dotenv
 from telethon import TelegramClient
 from telethon.errors import UserNotParticipantError
 from telethon.tl.functions.channels import GetFullChannelRequest
-from telethon.tl.types import Channel, Chat, MessageMediaPhoto, MessageMediaDocument
+from telethon.tl.functions.messages import GetHistoryRequest
+from telethon.tl.types import Channel, Chat, MessageMediaPhoto, MessageMediaDocument, PeerChannel, \
+    InputMessagesFilterPinned
 import mimetypes
 
 
@@ -38,14 +40,34 @@ class Scrapper:
     async def run(self):
         await self.connect()
         await self.create_dirs()
-        messages = await self.get_messages()
+        messages = await self.fetch_messages()
         dump_json(messages, f"{self.target}/jsons/messages")
         participants = await self.get_members()
         dump_json(participants, f"{self.target}/jsons/participants")
         await self.fetch_target_info()
         logs = await self.get_admin_log()
         dump_json(logs, f"{self.target}/jsons/logs")
+        pinned = await self.get_pinned_messages()
+        dump_json(pinned, f"{self.target}/jsons/pinned")
         await self.close()
+
+    async def get_pinned_messages(self):
+        pinned_messages = await self.client.get_messages(self.target, filter=InputMessagesFilterPinned, limit=100)
+
+        res = []
+
+        for msg in pinned_messages:
+            print(f"MSG: {msg}")
+            pinned_entry = {
+                'id': msg.id,
+                'text': msg.message,
+                'from_id': msg.from_id.user_id if msg.from_id else None,
+                'date': msg.date.isoformat(),
+                'changed_at': msg.edit_date.isoformat() if msg.edit_date and msg.edit_date != msg.date else None,
+            }
+            res.append(pinned_entry)
+        return res
+
 
     async def get_admin_log(self):
         logs = []
@@ -124,7 +146,7 @@ class Scrapper:
         else:
             return "Unknown"
 
-    async def get_messages(self):
+    async def fetch_messages(self):
         print("Started fetching messages..")
         messages = []
 
