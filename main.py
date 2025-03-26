@@ -222,6 +222,16 @@ class Scrapper:
                     msg_data['media'] = file_path if file_path else None
                 print("Media was saved successfully\n")
 
+            if message.media and hasattr(message.media, "geo"):
+                geo = message.media.geo
+
+                geo_entry = {
+                    "latitude": geo.lat,
+                    "longitude": geo.long
+                }
+
+                msg_data['geo'] = geo_entry
+
             messages.append(msg_data)
         res = {"target": await self.fetch_target_info(), "messages": messages}
         return res
