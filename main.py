@@ -6,9 +6,7 @@ from dotenv import load_dotenv
 from telethon import TelegramClient
 from telethon.errors import UserNotParticipantError
 from telethon.tl.functions.channels import GetFullChannelRequest
-from telethon.tl.functions.messages import GetHistoryRequest
-from telethon.tl.types import Channel, Chat, MessageMediaPhoto, MessageMediaDocument, PeerChannel, \
-    InputMessagesFilterPinned
+from telethon.tl.types import Channel, Chat, MessageMediaPhoto, MessageMediaDocument, InputMessagesFilterPinned
 import mimetypes
 
 
@@ -57,7 +55,6 @@ class Scrapper:
         res = []
 
         for msg in pinned_messages:
-            print(f"MSG: {msg}")
             pinned_entry = {
                 'id': msg.id,
                 'text': msg.message,
@@ -67,7 +64,6 @@ class Scrapper:
             }
             res.append(pinned_entry)
         return res
-
 
     async def get_admin_log(self):
         logs = []
