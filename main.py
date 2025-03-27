@@ -1,5 +1,5 @@
 import asyncio
-from bot import Scrapper, Config, dump_json, start_bot
+from bot import Scrapper, Config, dump_json
 
 
 target_channel = input("Enter channel username: ")
@@ -24,4 +24,3 @@ async def main():
 
 
 asyncio.run(main())
-

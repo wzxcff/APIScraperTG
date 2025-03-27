@@ -138,6 +138,14 @@ class Scrapper:
         count = 0
         comments = []
 
+        target_info = await self.fetch_target_info()
+
+        config = load_config()
+
+        conn = connect(config)
+
+        insert_group_info(target_info, conn)
+
         async for message in self.client.iter_messages(self.target, limit=10):
             count += 1
             print(f"\nMessage #{count} – fetching data")
@@ -230,16 +238,12 @@ class Scrapper:
                 msg_data['geo'] = geo_entry if message.media.geo else None
 
             messages.append(msg_data)
-        target_info = await self.fetch_target_info()
 
-        config = load_config()
+            if len(messages) > 100:
+                insert_message(messages, target_info["id"], conn)
 
-        print(f"Loaded config: {config}")
-
-        conn = connect(config)
-
-        # TODO: Create check for max_size messages (store it every 100 messages)
-        await insert_message(messages, target_info["id"], conn)
+        if messages:
+            insert_message(messages, target_info["id"], conn)
 
         res = {"target": target_info, "messages": messages}
         return res
