@@ -1,13 +1,11 @@
 import os
 import json
-import asyncio
 from datetime import datetime
-from dotenv import load_dotenv
-from telethon import TelegramClient
 from telethon.errors import UserNotParticipantError
 from telethon.tl.functions.channels import GetFullChannelRequest
 from telethon.tl.types import Channel, Chat, MessageMediaPhoto, MessageMediaDocument, InputMessagesFilterPinned
 import mimetypes
+from bot.settings import Config
 
 
 def dump_json(data, filename):
@@ -17,17 +15,16 @@ def dump_json(data, filename):
 
 class Scrapper:
     def __init__(self, target_channel):
-        load_dotenv()
-        self.api_id = int(os.getenv('API_ID'))
-        self.api_hash = os.getenv('API_HASH')
         self.target = target_channel
-        self.client = TelegramClient("session_name", self.api_id, self.api_hash)
+        self.client = Config.client
 
-        self.avatar_folder = f"{self.target}/avatars"
-        self.target_folder = f"{self.target}"
-        self.participants_avatars_folder = f"{self.target_folder}/participants_avatars"
-        self.media_folder = f"{self.target_folder}/media"
-        self.jsons_folder = f"{self.target_folder}/jsons"
+        self.folders = Config.get_folders(self.target)
+
+        self.avatar_folder = self.folders['avatar_folder']
+        self.target_folder = self.folders['target_folder']
+        self.participants_avatars_folder = self.folders['participants_avatars_folder']
+        self.media_folder = self.folders['media_folder']
+        self.jsons_folder = self.folders['jsons_folder']
 
     async def connect(self):
         await self.client.start()
@@ -105,10 +102,8 @@ class Scrapper:
         return res
 
     async def create_dirs(self):
-        os.makedirs(self.avatar_folder, exist_ok=True)
-        os.makedirs(self.participants_avatars_folder, exist_ok=True)
-        os.makedirs(self.media_folder, exist_ok=True)
-        os.makedirs(self.jsons_folder, exist_ok=True)
+        for folder in self.folders.values():
+            os.makedirs(folder, exist_ok=True)
 
     async def get_chat_type(self):
         entity = await self.client.get_entity(self.target)
@@ -149,6 +144,8 @@ class Scrapper:
                 'date': message.date.isoformat(),
                 'changed_at': message.edit_date.isoformat() if message.edit_date and message.edit_date != message.date else None
             }
+
+            # marker
 
             sender_dict = {}
             if sender_id:
