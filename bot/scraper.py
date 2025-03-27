@@ -175,13 +175,14 @@ class Scrapper:
                     sender_dict['avatar'] = avatar_path if os.path.exists(avatar_path) else None
                     sender_dict['is_bot'] = True if sender.bot else False
                 except Exception as e:
-                    sender_dict['name'] = "Cannot fetch info"
-                    msg_data['error'] = str(e)
+                    print(f"An unexpected error occurred during fetching messages: {e}")
             else:
-                sender_dict['first_name'] = "Unknown sender"
-                sender_dict['last_name'] = "Unknown sender"
+                sender_dict['user_id'] = None
+                sender_dict['first_name'] = None
+                sender_dict['last_name'] = None
                 sender_dict['username'] = None
                 sender_dict['avatar'] = None
+                sender_dict['is_bot'] = None
             msg_data['sender'] = sender_dict
 
             print("Searching for replies to message..")
@@ -246,6 +247,9 @@ class Scrapper:
             insert_message(messages, target_info["id"], conn)
 
         res = {"target": target_info, "messages": messages}
+
+        print("All result saved to configured DB")
+
         return res
 
     async def get_members(self):
