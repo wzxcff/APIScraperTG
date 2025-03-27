@@ -1,5 +1,4 @@
 from psycopg2.extras import execute_values
-import psycopg2
 
 
 def insert_message(batch, group_id, conn):
