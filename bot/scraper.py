@@ -6,6 +6,9 @@ from telethon.tl.functions.channels import GetFullChannelRequest
 from telethon.tl.types import Channel, Chat, MessageMediaPhoto, MessageMediaDocument, InputMessagesFilterPinned
 import mimetypes
 from bot.settings import Config
+from database.config import load_config
+from database.connect import connect
+from database.queries import *
 
 
 def dump_json(data, filename):
@@ -84,7 +87,8 @@ class Scrapper:
         channel_info = await self.client(GetFullChannelRequest(channel=self.target))
         full_chat = channel_info.full_chat
 
-        res = {"id": full_chat.id, "username": self.target, "title": channel_info.chats[0].title, "about": full_chat.about}
+        res = {"id": full_chat.id, "username": self.target, "title": channel_info.chats[0].title,
+               "about": full_chat.about}
 
         avatar_path = os.path.join(self.avatar_folder, f"{self.target}_avatar.jpg")
 
@@ -197,15 +201,18 @@ class Scrapper:
                 formatted_date = message.date.strftime("%Y-%m-%d_%H-%M-%S")
 
                 if isinstance(message.media, MessageMediaPhoto):
-                    file_path = await message.download_media(file=f"{self.target}/media/{formatted_date}_{message.id}.jpg")
+                    file_path = await message.download_media(
+                        file=f"{self.target}/media/{formatted_date}_{message.id}.jpg")
                     msg_data['media'] = file_path if file_path else None
                 elif isinstance(message.media, MessageMediaDocument):
                     try:
                         guessed_mime = mimetypes.guess_extension(message.media.document.mime_type)
                         print(f"Guessed mime: {guessed_mime}")
-                        file_path = await message.download_media(file=f"{self.target}/media/{formatted_date}_{message.id}{guessed_mime}")
+                        file_path = await message.download_media(
+                            file=f"{self.target}/media/{formatted_date}_{message.id}{guessed_mime}")
                     except Exception as e:
-                        file_path = await message.download_media(file=f"{self.target}/media/{formatted_date}_{message.id}.file")
+                        file_path = await message.download_media(
+                            file=f"{self.target}/media/{formatted_date}_{message.id}.file")
                         print(f"[ERROR] Error occurred during guessing mime type extension: {e}")
                     msg_data['media'] = file_path if file_path else None
                 print("Media was saved successfully\n")
@@ -223,7 +230,18 @@ class Scrapper:
                 msg_data['geo'] = geo_entry if message.media.geo else None
 
             messages.append(msg_data)
-        res = {"target": await self.fetch_target_info(), "messages": messages}
+        target_info = await self.fetch_target_info()
+
+        config = load_config()
+
+        print(f"Loaded config: {config}")
+
+        conn = connect(config)
+
+        # TODO: Create check for max_size messages (store it every 100 messages)
+        await insert_message(messages, target_info["id"], conn)
+
+        res = {"target": target_info, "messages": messages}
         return res
 
     async def get_members(self):
