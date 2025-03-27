@@ -9,8 +9,6 @@ def insert_group_info(group_info, conn):
         group_info["about"]
     )
 
-    print(f"INSERT GROUP ID: {entry[0]}")
-
     with conn.cursor() as cursor:
         cursor.execute(
             """ INSERT INTO groups (group_id, title, username, about)
@@ -39,22 +37,20 @@ def insert_message(batch, group_id, conn):
                     """, (el["sender"]["user_id"], el["sender"]["first_name"], el["sender"]["last_name"], el["sender"]["username"], el["sender"]["avatar"], el["sender"]["is_bot"])
                 )
 
-        geo = el.get("geo")
+        geo = el.get("geo", None)
         if geo:
             lat, lon = geo.get("latitude"), geo.get("longitude")
             if (lat, lon) not in geo_ids:
                 with conn.cursor() as cursor:
                     cursor.execute(
                         """
-                        INSERT INTO geo_locations (latitude, longitude)
-                        VALUES (%s, %s)
+                        INSERT INTO geo_locations (m_id, group_id, sender_id, latitude, longitude)
+                        VALUES (%s, %s, %s, %s, %s)
                         RETURNING id;
-                        """, (lat, lon)
+                        """, (el['id'], group_id, el['sender']['user_id'], lat, lon)
                     )
                     geo_id = cursor.fetchone()[0]
                     geo_ids[(lat, lon)] = geo_id
-        else:
-            geo_ids[(lat, lon)] = None
 
     values = []
     for el in batch:
@@ -72,8 +68,6 @@ def insert_message(batch, group_id, conn):
             geo_id
         )
         values.append(entry)
-
-    print(f"GROUP ID IN MESSAGE: {group_id}")
 
     query = """
         INSERT INTO messages 
