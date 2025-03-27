@@ -144,6 +144,8 @@ class Scrapper:
 
         conn = connect(config)
 
+        insert_group_info(target_info, conn)
+
         async for message in self.client.iter_messages(self.target, limit=10):
             count += 1
             print(f"\nMessage #{count} – fetching data")
@@ -238,10 +240,10 @@ class Scrapper:
             messages.append(msg_data)
 
             if len(messages) > 100:
-                await insert_message(messages, target_info["id"], conn)
+                insert_message(messages, target_info["id"], conn)
 
         if messages:
-            await insert_message(messages, target_info["id"], conn)
+            insert_message(messages, target_info["id"], conn)
 
         res = {"target": target_info, "messages": messages}
         return res
