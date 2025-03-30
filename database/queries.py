@@ -54,6 +54,7 @@ def insert_group_info(group_info, conn):
 
 
 def insert_message(batch, group_id, conn):
+    print(f"\n\n–––BATCH INFO–––\n\nBatch length: {len(batch)}\nContent: {batch}")
     if conn is None:
         print("Failed to connect to the database.")
         return
@@ -84,34 +85,6 @@ def insert_message(batch, group_id, conn):
             (m_id, text, date, changed_at, sender_id, group_id, media, geo_id) 
             VALUES %s;
         """
-        execute_values(cursor, query, values)
-        conn.commit()
-
-    values = []
-    for el in batch:
-        geo = el.get("geo")
-        geo_id = geo_ids.get((geo.get("latitude"), geo.get("longitude"))) if geo else None
-
-        entry = (
-            el["id"],
-            el["text"],
-            el["date"],
-            el["changed_at"],
-            el["sender"]["user_id"],
-            group_id,
-            el["media"],
-            geo_id
-        )
-        values.append(entry)
-
-    query = """
-        INSERT INTO messages 
-        (m_id, text, date, changed_at, sender_id, group_id, media, geo_id) 
-        VALUES %s
-        ON CONFLICT (id) DO NOTHING;
-    """
-
-    with conn.cursor() as cursor:
         execute_values(cursor, query, values)
         conn.commit()
 
