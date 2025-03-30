@@ -42,6 +42,12 @@ class Scrapper:
     async def get_pinned_messages(self):
         pinned_messages = await self.client.get_messages(self.target, filter=InputMessagesFilterPinned, limit=100)
 
+        target_info = await self.fetch_target_info()
+
+        config = load_config()
+
+        conn = connect(config)
+
         res = []
 
         for msg in pinned_messages:
@@ -53,6 +59,12 @@ class Scrapper:
                 'changed_at': msg.edit_date.isoformat() if msg.edit_date and msg.edit_date != msg.date else None,
             }
             res.append(pinned_entry)
+
+            if len(res) > 100:
+                insert_pinned_messages(res, target_info["id"], conn)
+
+        if res:
+            insert_pinned_messages(res, target_info["id"], conn)
         return res
 
     async def get_admin_log(self):
