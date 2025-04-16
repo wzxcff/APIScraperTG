@@ -1,10 +1,10 @@
 import asyncio
-from .scraper import Scrapper
+from .scraper import Scraper
 
 
 async def main():
     target_username = input("Введите @username группы или канала: ")
-    scrapper = Scrapper(target_username)
+    scrapper = Scraper(target_username)
     await scrapper.run()
 
 
