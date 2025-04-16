@@ -1,5 +1,6 @@
 import asyncio
-from bot import Scrapper, Config, dump_json
+from bot import Scraper, Config, dump_json
+
 
 
 target_channel = input("Enter channel username: ")
@@ -8,7 +9,7 @@ folders = Config.get_folders(target_channel)
 
 
 async def main():
-    bot = Scrapper(target_channel)
+    bot = Scraper(target_channel)
     await bot.initialize()
 
     data_dict = {

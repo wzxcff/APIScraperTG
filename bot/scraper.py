@@ -11,13 +11,23 @@ from database.connect import connect
 from database.queries import *
 
 
-def dump_json(data, filename):
+def dump_json(data, filename: str):
+    """
+    Dumps info in json file.\n
+    Filename can be used for specifying path too.
+    """
     with open(f'{filename}.json', 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
 
 
-class Scrapper:
-    def __init__(self, target_channel):
+class Scraper:
+    """Create instance of scraper class, and work with it"""
+    def __init__(self, target_channel: str):
+        """
+        Init Scrapper class\n
+        **Usage:** bot = Scrapper("durov")
+        :param target_channel:
+        """
         self.target = target_channel
         self.client = Config.client
 
@@ -30,23 +40,32 @@ class Scrapper:
         self.jsons_folder = self.folders['jsons_folder']
 
     async def connect(self):
+        """Connect to telegram client.\n
+        **Is not meant to be called directly!**"""
         await self.client.start()
 
     async def close(self):
+        """Close connection to telegram client\n
+        **Is not meant to be called directly!**"""
         await self.client.disconnect()
 
     async def initialize(self):
+        """Initialize method, calls connect() and create_dirs()\n
+        **Is not meant to be called directly!**"""
         await self.connect()
         await self.create_dirs()
 
     async def get_pinned_messages(self):
+        """Get all of pinned messages in the group.\n
+        Every 100 messages will call insert_pinned_messages to DB.\n
+        **Usage:** await bot.get_pinned_messages()
+        :returns: list with pinned messages
+        """
         pinned_messages = await self.client.get_messages(self.target, filter=InputMessagesFilterPinned, limit=100)
 
         target_info = await self.fetch_target_info()
 
-        config = load_config()
-
-        conn = connect(config)
+        config, conn = None, None
 
         res = []
 
@@ -60,14 +79,19 @@ class Scrapper:
             }
             res.append(pinned_entry)
 
-            if len(res) > 100:
-                insert_pinned_messages(res, target_info["id"], conn)
+        if res and Config.save_to_db:
+            config = load_config()
 
-        if res:
+            conn = connect(config)
             insert_pinned_messages(res, target_info["id"], conn)
+
         return res
 
     async def get_admin_log(self):
+        """Get logs about admin actions.\n
+        **Usage:** await bot.get_admin_log()
+        :returns: list with logs
+        """
         logs = []
 
         if await self.get_chat_type() in ["Channel admin"]:
@@ -95,7 +119,11 @@ class Scrapper:
                 logs.append(log_entry)
         return logs
 
-    async def fetch_target_info(self):
+    async def fetch_target_info(self) -> dict:
+        """Fetch maximum of information about target (channel).\n
+        **Usage:** await bot.fetch_target_info()
+        :returns: dict with info about target (channel)
+        """
         channel_info = await self.client(GetFullChannelRequest(channel=self.target))
         full_chat = channel_info.full_chat
 
@@ -118,10 +146,13 @@ class Scrapper:
         return res
 
     async def create_dirs(self):
+        """Generate dirs based on Config dirs.\n
+        **Is not meant to be called directly!**"""
         for folder in self.folders.values():
             os.makedirs(folder, exist_ok=True)
 
-    async def get_chat_type(self):
+    async def get_chat_type(self) -> str:
+        """Get chat type, returns string with a type"""
         entity = await self.client.get_entity(self.target)
 
         if isinstance(entity, Channel):
@@ -143,7 +174,11 @@ class Scrapper:
         else:
             return "Unknown"
 
-    async def fetch_messages(self):
+    async def fetch_messages(self) -> dict:
+        """Fetch messages from group, will save everything to DB, and create JSON file.\n
+        **Usage:** await bot.fetch_messages()
+        :returns: dict with messages
+        """
         print("Started fetching messages..")
         messages = []
 
@@ -151,12 +186,14 @@ class Scrapper:
         comments = []
 
         target_info = await self.fetch_target_info()
+        config, conn = None, None
 
-        config = load_config()
+        if Config.save_to_db:
+            print("AJSIDJASD")
+            config = load_config()
 
-        conn = connect(config)
-
-        insert_group_info(target_info, conn)
+            conn = connect(config)
+            insert_group_info(target_info, conn)
 
         async for message in self.client.iter_messages(self.target, limit=10):
             count += 1
@@ -168,8 +205,6 @@ class Scrapper:
                 'date': message.date.isoformat(),
                 'changed_at': message.edit_date.isoformat() if message.edit_date and message.edit_date != message.date else None
             }
-
-            # marker
 
             sender_dict = {}
             if sender_id:
@@ -252,19 +287,25 @@ class Scrapper:
 
             messages.append(msg_data)
 
-            if len(messages) > 100:
+            if len(messages) > 100 and Config.save_to_db:
                 insert_message(messages, target_info["id"], conn)
 
-        if messages:
+        if messages and Config.save_to_db:
             insert_message(messages, target_info["id"], conn)
 
         res = {"target": target_info, "messages": messages}
 
-        print("All result saved to configured DB")
+        if Config.save_to_db:
+            print("All result saved to configured DB")
 
         return res
 
-    async def get_members(self):
+    async def get_members(self) -> dict:
+        """Try to fetch a list with all group members, if possible.\n
+        Group members can be fetched in channels only if our user is admin
+        **Usage:** bot.get_members()
+        :returns: dict with group/channel participants
+        """
         users = []
         users_dict = {"target": self.target}
         users_list = []
