@@ -9,6 +9,7 @@ from bot.settings import Config
 from database.config import load_config
 from database.connect import connect
 from database.queries import *
+import time
 
 
 def dump_json(data, filename: str):
@@ -61,7 +62,7 @@ class Scraper:
         **Usage:** await bot.get_pinned_messages()
         :returns: list with pinned messages
         """
-        pinned_messages = await self.client.get_messages(self.target, filter=InputMessagesFilterPinned, limit=100)
+        pinned_messages = await self.client.get_messages(self.target, filter=InputMessagesFilterPinned, limit=10)
 
         target_info = await self.fetch_target_info()
 
@@ -119,30 +120,54 @@ class Scraper:
                 logs.append(log_entry)
         return logs
 
-    async def fetch_target_info(self) -> dict:
-        """Fetch maximum of information about target (channel).\n
-        **Usage:** await bot.fetch_target_info()
-        :returns: dict with info about target (channel)
+    async def fetch_target_info(self, full: bool = False) -> dict:
         """
-        channel_info = await self.client(GetFullChannelRequest(channel=self.target))
-        full_chat = channel_info.full_chat
+        Fetch basic (fast) or full (slow) info about the target channel.
+        :param full: Set to True to fetch full participant and admin stats + avatar.
+        :returns: dict with target info
+        """
 
-        res = {"id": full_chat.id, "username": self.target, "title": channel_info.chats[0].title,
-               "about": full_chat.about}
+        entity = await self.client.get_entity(self.target)
 
-        avatar_path = os.path.join(self.avatar_folder, f"{self.target}_avatar.jpg")
+        res = {
+            "id": entity.id,
+            "username": self.target,
+            "title": entity.title,
+            "about": None,
+            "avatar": None,
+            "participants_count": "-",
+            "admins_count": "-",
+            "kicked_count": "-",
+            "banned_count": "-",
+            "online_count": "-",
+            "requested_at": datetime.now().isoformat()
+        }
 
-        if full_chat.chat_photo:
-            profile_photos = await self.client.get_profile_photos(self.target)
-            if profile_photos:
-                await self.client.download_media(profile_photos[0], file=avatar_path)
-        res["avatar"] = avatar_path if os.path.exists(avatar_path) else None
-        res["participants_count"] = full_chat.participants_count if full_chat.participants_count else "-"
-        res["admins_count"] = full_chat.admins_count if full_chat.admins_count else "-"
-        res["kicked_count"] = full_chat.kicked_count if full_chat.kicked_count else "-"
-        res["banned_count"] = full_chat.banned_count if full_chat.banned_count else "-"
-        res["online_count"] = full_chat.online_count if full_chat.online_count else "-"
-        res["requested_at"] = datetime.now().isoformat()
+        if full:
+            print("Fetching full channel info (this may take time)...")
+            start = time.time()
+            channel_info = await self.client(GetFullChannelRequest(channel=self.target))
+            print(f"Full channel info fetched in {time.time() - start:.2f} seconds")
+
+            full_chat = channel_info.full_chat
+            res["about"] = full_chat.about
+
+            res["participants_count"] = full_chat.participants_count or "-"
+            res["admins_count"] = full_chat.admins_count or "-"
+            res["kicked_count"] = full_chat.kicked_count or "-"
+            res["banned_count"] = full_chat.banned_count or "-"
+            res["online_count"] = full_chat.online_count or "-"
+
+            avatar_path = os.path.join(self.avatar_folder, f"{self.target}_avatar.jpg")
+            if full_chat.chat_photo:
+                try:
+                    profile_photos = await self.client.get_profile_photos(self.target)
+                    if profile_photos:
+                        await self.client.download_media(profile_photos[0], file=avatar_path)
+                        res["avatar"] = avatar_path if os.path.exists(avatar_path) else None
+                except Exception as e:
+                    print(f"[ERROR] Failed to fetch avatar: {e}")
+
         return res
 
     async def create_dirs(self):
