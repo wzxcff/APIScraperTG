@@ -13,13 +13,14 @@ class Config:
     API_HASH = os.getenv('API_HASH')
     client = TelegramClient("session_name", api_id=API_ID, api_hash=API_HASH)
     save_to_db = False  # Don't turn on
+    max_attempts = 3
 
     @staticmethod
     def get_folders(target_channel):
         return {
-            "avatar_folder": f"{target_channel}/avatars",
+            "avatar_folder": os.path.join(target_channel, "avatars"),
             "target_folder": f"{target_channel}",
-            "participants_avatars_folder": f"{target_channel}/participants_avatars",
-            "media_folder": f"{target_channel}/media",
-            "jsons_folder": f"{target_channel}/jsons",
+            "participants_avatars_folder": os.path.join(target_channel, "participants_avatars"),
+            "media_folder": os.path.join(target_channel, "media"),
+            "jsons_folder": os.path.join(target_channel, "jsons"),
         }
