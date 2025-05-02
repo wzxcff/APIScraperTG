@@ -9,16 +9,8 @@ from bot.settings import Config
 from database.config import load_config
 from database.connect import connect
 from database.queries import *
+from .utils import safe_call
 import time
-
-
-def dump_json(data, filename: str):
-    """
-    Dumps info in json file.\n
-    Filename can be used for specifying path too.
-    """
-    with open(f'{filename}.json', 'w', encoding='utf-8') as f:
-        json.dump(data, f, ensure_ascii=False, indent=4)
 
 
 class Scraper:
@@ -62,7 +54,7 @@ class Scraper:
         **Usage:** await bot.get_pinned_messages()
         :returns: list with pinned messages
         """
-        pinned_messages = await self.client.get_messages(self.target, filter=InputMessagesFilterPinned, limit=10)
+        pinned_messages = await safe_call(self.client.get_messages(self.target, filter=InputMessagesFilterPinned, limit=10), "get_pinned_messages")
 
         target_info = await self.fetch_target_info()
 
@@ -109,7 +101,7 @@ class Scraper:
                 }
 
                 try:
-                    user = await self.client.get_entity(action.user_id)
+                    user = await safe_call(self.client.get_entity(action.user_id), "get_admin_log")
                     log_entry["performed_by"]["first_name"] = user.first_name
                     log_entry["performed_by"]["username"] = user.username
                 except Exception as e:
@@ -126,8 +118,7 @@ class Scraper:
         :param full: Set to True to fetch full participant and admin stats + avatar.
         :returns: dict with target info
         """
-
-        entity = await self.client.get_entity(self.target)
+        entity = await safe_call(self.client.get_entity(self.target), "fetch_target_info")
 
         res = {
             "id": entity.id,
@@ -135,18 +126,18 @@ class Scraper:
             "title": entity.title,
             "about": None,
             "avatar": None,
-            "participants_count": "-",
-            "admins_count": "-",
-            "kicked_count": "-",
-            "banned_count": "-",
-            "online_count": "-",
+            "participants_count": None,
+            "admins_count": None,
+            "kicked_count": None,
+            "banned_count": None,
+            "online_count": None,
             "requested_at": datetime.now().isoformat()
         }
 
         if full:
             print("Fetching full channel info (this may take time)...")
             start = time.time()
-            channel_info = await self.client(GetFullChannelRequest(channel=self.target))
+            channel_info = await safe_call(self.client(GetFullChannelRequest(channel=self.target)), "fetch_target_info")
             print(f"Full channel info fetched in {time.time() - start:.2f} seconds")
 
             full_chat = channel_info.full_chat
@@ -161,9 +152,9 @@ class Scraper:
             avatar_path = os.path.join(self.avatar_folder, f"{self.target}_avatar.jpg")
             if full_chat.chat_photo:
                 try:
-                    profile_photos = await self.client.get_profile_photos(self.target)
+                    profile_photos = await safe_call(self.client.get_profile_photos(self.target), "fetch_target_info")
                     if profile_photos:
-                        await self.client.download_media(profile_photos[0], file=avatar_path)
+                        await safe_call(self.client.download_media(profile_photos[0], file=avatar_path), "fetch_target_info")
                         res["avatar"] = avatar_path if os.path.exists(avatar_path) else None
                 except Exception as e:
                     print(f"[ERROR] Failed to fetch avatar: {e}")
@@ -178,7 +169,7 @@ class Scraper:
 
     async def get_chat_type(self) -> str:
         """Get chat type, returns string with a type"""
-        entity = await self.client.get_entity(self.target)
+        entity = await safe_call(self.client.get_entity(self.target), "get_chat_type")
 
         if isinstance(entity, Channel):
             if entity.megagroup:
@@ -186,7 +177,7 @@ class Scraper:
             else:
                 user = await self.client.get_me()
                 try:
-                    permissions = await self.client.get_permissions(self.target, user.id)
+                    permissions = await safe_call(self.client.get_permissions(self.target, user.id), "get_chat_type")
                 except UserNotParticipantError:
                     print("User not participant")
                     return "User not participant"
@@ -214,7 +205,6 @@ class Scraper:
         config, conn = None, None
 
         if Config.save_to_db:
-            print("AJSIDJASD")
             config = load_config()
 
             conn = connect(config)
@@ -234,7 +224,7 @@ class Scraper:
             sender_dict = {}
             if sender_id:
                 try:
-                    sender = await self.client.get_entity(sender_id)
+                    sender = await safe_call(self.client.get_entity(sender_id), "fetch_messages")
                     sender_dict['user_id'] = sender_id
                     sender_dict['first_name'] = sender.first_name if sender.first_name else None
                     sender_dict['last_name'] = sender.last_name if sender.last_name else None
@@ -242,7 +232,7 @@ class Scraper:
 
                     avatar_path = os.path.join(self.avatar_folder, f"{sender_id}_{sender.first_name}.jpg")
                     if sender.photo and not os.path.exists(avatar_path):
-                        await self.client.download_profile_photo(sender, file=avatar_path)
+                        await safe_call(self.client.download_profile_photo(sender, file=avatar_path))
 
                     sender_dict['avatar'] = avatar_path if os.path.exists(avatar_path) else None
                     sender_dict['is_bot'] = True if sender.bot else False
@@ -282,18 +272,18 @@ class Scraper:
                 formatted_date = message.date.strftime("%Y-%m-%d_%H-%M-%S")
 
                 if isinstance(message.media, MessageMediaPhoto):
-                    file_path = await message.download_media(
-                        file=f"{self.target}/media/{formatted_date}_{message.id}.jpg")
+                    file_path = await safe_call(message.download_media(
+                        file=f"{self.target}/media/{formatted_date}_{message.id}.jpg"), "fetch_messages")
                     msg_data['media'] = file_path if file_path else None
                 elif isinstance(message.media, MessageMediaDocument):
                     try:
                         guessed_mime = mimetypes.guess_extension(message.media.document.mime_type)
                         print(f"Guessed mime: {guessed_mime}")
-                        file_path = await message.download_media(
-                            file=f"{self.target}/media/{formatted_date}_{message.id}{guessed_mime}")
+                        file_path = await safe_call(message.download_media(
+                            file=f"{self.target}/media/{formatted_date}_{message.id}{guessed_mime}"), "fetch_messages")
                     except Exception as e:
-                        file_path = await message.download_media(
-                            file=f"{self.target}/media/{formatted_date}_{message.id}.file")
+                        file_path = await safe_call(message.download_media(
+                            file=f"{self.target}/media/{formatted_date}_{message.id}.file"), "fetch_messages")
                         print(f"[ERROR] Error occurred during guessing mime type extension: {e}")
                     msg_data['media'] = file_path if file_path else None
                 print("Media was saved successfully\n")
@@ -338,7 +328,7 @@ class Scraper:
         chat_type = await self.get_chat_type()
 
         if chat_type in ["Mega group", "Channel admin", "Chat group"]:
-            users = await self.client.get_participants(self.target)
+            users = await safe_call(self.client.get_participants(self.target), "get_members")
         elif chat_type == "Channel user":
             print("Cannot fetch members. You're not an admin.")
         else:
@@ -358,7 +348,7 @@ class Scraper:
                 }
 
                 if user.photo and not os.path.exists(participant_path):
-                    await self.client.download_profile_photo(user_entity, file=participant_path)
+                    await safe_call(self.client.download_profile_photo(user_entity, file=participant_path), "get_members")
 
                 user_data['avatar'] = participant_path if os.path.exists(participant_path) else None
                 users_list.append(user_data)

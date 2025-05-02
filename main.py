@@ -23,5 +23,5 @@ async def main():
     for name, data in data_dict.items():
         dump_json(data, f"{folders['jsons_folder']}/{name}")
 
-
-asyncio.run(main())
+if __name__ == "__main__":
+    asyncio.run(main())
