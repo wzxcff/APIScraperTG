@@ -62,7 +62,6 @@ class Scraper:
 
         if Config.stop_event.is_set():
             logging.info("Interrupted by user")
-            print("Program stopped by user.")
             return None
 
         pinned_messages = await safe_call(self.client.get_messages(self.target, filter=InputMessagesFilterPinned, limit=10), "get_pinned_messages")
@@ -102,7 +101,6 @@ class Scraper:
 
         if Config.stop_event.is_set():
             logging.info("Interrupted by user")
-            print("Program stopped by user.")
             return None
 
         logs = []
@@ -143,7 +141,6 @@ class Scraper:
 
         if Config.stop_event.is_set():
             logging.info("Interrupted by user")
-            print("Program stopped by user.")
             return None
 
         entity = await safe_call(self.client.get_entity(self.target), "fetch_target_info")
@@ -203,7 +200,6 @@ class Scraper:
 
         if Config.stop_event.is_set():
             logging.info("Interrupted by user")
-            print("Program stopped by user.")
             return None
 
         entity = await safe_call(self.client.get_entity(self.target), "get_chat_type")
@@ -254,7 +250,6 @@ class Scraper:
             try:
                 if Config.stop_event.is_set():
                     logging.info("Interrupted by user")
-                    print("Program stopped by user.")
                     break
                 count += 1
                 logging.debug(f"Message #{count} – fetching data")
@@ -373,7 +368,6 @@ class Scraper:
 
         if Config.stop_event.is_set():
             logging.info("Interrupted by user")
-            print("Program stopped by user.")
             return None
 
         users = []

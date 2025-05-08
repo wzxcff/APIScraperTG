@@ -32,6 +32,7 @@ def input_listener():
         cmd = input("Type \"exit\" to safe exit program: ")
         if cmd.strip().lower() == "exit":
             Config.stop_event.set()
+            print("Program stopped by user\nwaiting for everything to save...")
             break
 
 
@@ -48,7 +49,6 @@ async def main():
     threading.Thread(target=input_listener, daemon=True).start()
 
     if Config.stop_event.is_set():
-        print("Program stopped by user.")
         return
 
     if start_from_last_msg:
