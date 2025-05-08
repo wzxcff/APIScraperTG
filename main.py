@@ -1,7 +1,10 @@
 import asyncio
 import os
+import threading
 from bot import Scraper, Config, dump_json
 from bot.utils import get_last_message_id
+from bot import Config
+from bot.settings import logging
 
 
 target_channel = ""
@@ -24,6 +27,15 @@ def menu():
         ask_for_limit_n_offset()
 
 
+def input_listener():
+    while True:
+        cmd = input("Type \"exit\" to safe exit program: ")
+        if cmd.strip().lower() == "exit":
+            Config.stop_event.set()
+            break
+
+
+
 
 async def main():
     global user_limit, user_offset
@@ -33,6 +45,12 @@ async def main():
     offset = 0
     limit = 100
 
+    threading.Thread(target=input_listener, daemon=True).start()
+
+    if Config.stop_event.is_set():
+        print("Program stopped by user.")
+        return
+
     if start_from_last_msg:
         offset = get_last_message_id(os.path.join(folders["jsons_folder"], "messages.json"))
         print(f"Set offset of fetch_message to last message_id: {offset}")
@@ -40,12 +58,12 @@ async def main():
     if specify_limit_offset:
         if user_limit is not None:
             limit = user_limit
-            print("Found user specified limit, overriding default value")
+            logging.debug("Found user specified limit, overriding default value")
         if user_offset is not None:
             offset = user_offset
-            print(f"Found user specified offset, overriding last message_id offset")
+            logging.debug(f"Found user specified offset, overriding last message_id offset")
 
-    print(f"Passed limit: {limit}, offset: {offset}")
+    logging.debug(f"Passed limit: {limit}, offset: {offset}")
     data_dict = {
         "messages": await bot.fetch_messages(limit=limit, offset=offset),
         "participants": await bot.get_members(),

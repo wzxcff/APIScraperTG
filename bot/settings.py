@@ -1,6 +1,8 @@
 import os
 from dotenv import load_dotenv
 from telethon import TelegramClient
+from threading import Event
+import logging
 
 load_dotenv(dotenv_path='.env')
 
@@ -14,6 +16,16 @@ class Config:
     client = TelegramClient("session_name", api_id=API_ID, api_hash=API_HASH)
     save_to_db = False  # Do not turn on! (yet)
     max_attempts = 3
+    stop_event = Event()
+
+    logging.basicConfig(
+        filename="logs.log",
+        encoding="utf-8",
+        # level=logging.INFO,
+        level=logging.DEBUG,
+        format="[%(asctime)s][%(name)s][%(funcName)s] %(levelname)s - %(message)s",
+        datefmt="%d.%m, %H:%M:%S"
+    )
 
     @staticmethod
     def get_folders(target_channel):
