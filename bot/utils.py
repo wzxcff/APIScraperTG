@@ -12,6 +12,23 @@ def dump_json(data, filename: str):
         json.dump(data, f, ensure_ascii=False, indent=4)
 
 
+def get_last_message_id(filename: str):
+    """
+    Reads last saved message ID from messages.json file.\n
+    :param filename: path to JSON file
+    """
+    with open(filename, 'r', encoding='utf-8') as f:
+        data = dict(json.load(f))
+        try:
+            return data["messages"][0]["id"]
+        except KeyError:
+            print("[get_last_message_id] Couldn't find message ID in messages.json")
+            return None
+        except FileNotFoundError:
+            print("[get_last_message_id] File messages.json doesn't exist")
+            return None
+
+
 async def safe_call(coro, method_name="unknown"):
     """
     This method used to make safe calls, and stabilising them with try except expression.
@@ -27,6 +44,6 @@ async def safe_call(coro, method_name="unknown"):
             print(f"[FloodWait] - [{method_name}] Too many requests sent! Waiting for {e.seconds} seconds...")
         except Exception as e:
             if attempts > max_attempts:
-                raise FloodWaitError(f"Error during calling method \"{method_name}\". Program used all of {max_attempts} available attempts.")
+                raise RuntimeError(f"Error during calling method \"{method_name}\". Program used all of {max_attempts} available attempts.")
             print(f"[Exception] - [{method_name}] Unexpected exception occurred: {e}\nRetrying...")
             attempts += 1

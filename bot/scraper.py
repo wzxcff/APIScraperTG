@@ -190,7 +190,7 @@ class Scraper:
         else:
             return "Unknown"
 
-    async def fetch_messages(self) -> dict:
+    async def fetch_messages(self, limit=100, offset=0) -> dict:
         """Fetch messages from group, will save everything to DB, and create JSON file.\n
         **Usage:** await bot.fetch_messages()
         :returns: dict with messages
@@ -210,7 +210,7 @@ class Scraper:
             conn = connect(config)
             insert_group_info(target_info, conn)
 
-        async for message in self.client.iter_messages(self.target, limit=10):
+        async for message in self.client.iter_messages(self.target, limit=limit, offset_id=offset):
             count += 1
             print(f"\nMessage #{count} – fetching data")
             sender_id = message.from_id.user_id if message.from_id else None
