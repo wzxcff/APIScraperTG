@@ -12,7 +12,7 @@ class Config:
     API_ID = int(os.getenv('API_ID'))
     API_HASH = os.getenv('API_HASH')
     client = TelegramClient("session_name", api_id=API_ID, api_hash=API_HASH)
-    save_to_db = False  # Don't turn on
+    save_to_db = False  # Do not turn on! (yet)
     max_attempts = 3
 
     @staticmethod
