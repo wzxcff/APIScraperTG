@@ -1,4 +1,6 @@
 import json
+import time
+
 from .settings import Config
 from telethon.errors import FloodWaitError
 
@@ -47,3 +49,14 @@ async def safe_call(coro, method_name="unknown"):
                 raise RuntimeError(f"Error during calling method \"{method_name}\". Program used all of {max_attempts} available attempts.")
             print(f"[Exception] - [{method_name}] Unexpected exception occurred: {e}\nRetrying...")
             attempts += 1
+
+
+def record_time(func):
+    def wrapper(*args, **kwargs):
+        start_time = time.time()
+        result = func(*args, **kwargs)
+        end_time = time.time()
+        total = end_time - start_time
+        print(f"[record_time] {func.__name__} took {total} seconds")
+        return result
+    return wrapper

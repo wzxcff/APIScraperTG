@@ -1,5 +1,4 @@
 import os
-import json
 from datetime import datetime
 from telethon.errors import UserNotParticipantError
 from telethon.tl.functions.channels import GetFullChannelRequest
@@ -11,7 +10,7 @@ from database.connect import connect
 from database.queries import *
 from .utils import safe_call
 import time
-
+from bot.settings import logging
 
 class Scraper:
     """Create instance of scraper class, and work with it"""
@@ -32,21 +31,26 @@ class Scraper:
         self.media_folder = self.folders['media_folder']
         self.jsons_folder = self.folders['jsons_folder']
 
+        logging.info("Program initialized")
+
     async def connect(self):
         """Connect to telegram client.\n
         **Is not meant to be called directly!**"""
         await self.client.start()
+        logging.info("Connected to telegram client")
 
     async def close(self):
         """Close connection to telegram client\n
         **Is not meant to be called directly!**"""
         await self.client.disconnect()
+        logging.info("Closing connection to telegram client")
 
     async def initialize(self):
         """Initialize method, calls connect() and create_dirs()\n
         **Is not meant to be called directly!**"""
         await self.connect()
         await self.create_dirs()
+        logging.info("Instance initialized")
 
     async def get_pinned_messages(self):
         """Get all of pinned messages in the group.\n
@@ -54,6 +58,13 @@ class Scraper:
         **Usage:** await bot.get_pinned_messages()
         :returns: list with pinned messages
         """
+        logging.info("Started fetching pinned messages")
+
+        if Config.stop_event.is_set():
+            logging.info("Interrupted by user")
+            print("Program stopped by user.")
+            return None
+
         pinned_messages = await safe_call(self.client.get_messages(self.target, filter=InputMessagesFilterPinned, limit=10), "get_pinned_messages")
 
         target_info = await self.fetch_target_info()
@@ -78,6 +89,8 @@ class Scraper:
             conn = connect(config)
             insert_pinned_messages(res, target_info["id"], conn)
 
+        logging.info("Finished fetching pinned messages")
+
         return res
 
     async def get_admin_log(self):
@@ -85,6 +98,13 @@ class Scraper:
         **Usage:** await bot.get_admin_log()
         :returns: list with logs
         """
+        logging.info("Started fetching admin logs")
+
+        if Config.stop_event.is_set():
+            logging.info("Interrupted by user")
+            print("Program stopped by user.")
+            return None
+
         logs = []
 
         if await self.get_chat_type() in ["Channel admin"]:
@@ -110,14 +130,22 @@ class Scraper:
                     log_entry["error"] = str(e)
 
                 logs.append(log_entry)
+        logging.info("Finished fetching admin logs")
         return logs
 
-    async def fetch_target_info(self, full: bool = False) -> dict:
+    async def fetch_target_info(self, full: bool = False) -> dict | None:
         """
         Fetch basic (fast) or full (slow) info about the target channel.
         :param full: Set to True to fetch full participant and admin stats + avatar.
         :returns: dict with target info
         """
+        logging.info("Started fetching target info")
+
+        if Config.stop_event.is_set():
+            logging.info("Interrupted by user")
+            print("Program stopped by user.")
+            return None
+
         entity = await safe_call(self.client.get_entity(self.target), "fetch_target_info")
 
         res = {
@@ -135,10 +163,10 @@ class Scraper:
         }
 
         if full:
-            print("Fetching full channel info (this may take time)...")
+            logging.info("Started fetching full target info (this may take some time)")
             start = time.time()
             channel_info = await safe_call(self.client(GetFullChannelRequest(channel=self.target)), "fetch_target_info")
-            print(f"Full channel info fetched in {time.time() - start:.2f} seconds")
+            logging.info(f"Full channel info fetched in {time.time() - start:.2f} seconds")
 
             full_chat = channel_info.full_chat
             res["about"] = full_chat.about
@@ -158,32 +186,44 @@ class Scraper:
                         res["avatar"] = avatar_path if os.path.exists(avatar_path) else None
                 except Exception as e:
                     print(f"[ERROR] Failed to fetch avatar: {e}")
-
+        logging.info("Finished fetching target info")
         return res
 
     async def create_dirs(self):
         """Generate dirs based on Config dirs.\n
         **Is not meant to be called directly!**"""
+        logging.info("Started creating dirs")
         for folder in self.folders.values():
             os.makedirs(folder, exist_ok=True)
+        logging.info("Finished creating dirs")
 
-    async def get_chat_type(self) -> str:
+    async def get_chat_type(self) -> str | None:
         """Get chat type, returns string with a type"""
+        logging.info("Started parsing chat type")
+
+        if Config.stop_event.is_set():
+            logging.info("Interrupted by user")
+            print("Program stopped by user.")
+            return None
+
         entity = await safe_call(self.client.get_entity(self.target), "get_chat_type")
 
         if isinstance(entity, Channel):
             if entity.megagroup:
+                logging.info("Parsed chat type: Mega group")
                 return "Mega group"
             else:
                 user = await self.client.get_me()
                 try:
                     permissions = await safe_call(self.client.get_permissions(self.target, user.id), "get_chat_type")
                 except UserNotParticipantError:
-                    print("User not participant")
+                    logging.warning(f"User is not participant!")
                     return "User not participant"
                 if permissions.is_admin or permissions.is_creator:
+                    logging.info("Parsed chat type: Creator/Admin")
                     return "Channel admin"
                 else:
+                    logging.info("Parsed chat type: user (participant)")
                     return "Channel user"
         elif isinstance(entity, Chat):
             return "Chat group"
@@ -195,7 +235,7 @@ class Scraper:
         **Usage:** await bot.fetch_messages()
         :returns: dict with messages
         """
-        print("Started fetching messages..")
+        logging.info("Started fetching messages")
         messages = []
 
         count = 0
@@ -211,82 +251,90 @@ class Scraper:
             insert_group_info(target_info, conn)
 
         async for message in self.client.iter_messages(self.target, limit=limit, offset_id=offset):
-            count += 1
-            print(f"\nMessage #{count} – fetching data")
-            sender_id = message.from_id.user_id if message.from_id else None
-            msg_data = {
-                'id': message.id,
-                'text': message.text,
-                'date': message.date.isoformat(),
-                'changed_at': message.edit_date.isoformat() if message.edit_date and message.edit_date != message.date else None
-            }
+            try:
+                if Config.stop_event.is_set():
+                    logging.info("Interrupted by user")
+                    print("Program stopped by user.")
+                    break
+                count += 1
+                logging.debug(f"Message #{count} – fetching data")
+                sender_id = message.from_id.user_id if message.from_id else None
+                msg_data = {
+                    'id': message.id,
+                    'text': message.text,
+                    'date': message.date.isoformat(),
+                    'changed_at': message.edit_date.isoformat() if message.edit_date and message.edit_date != message.date else None
+                }
 
-            sender_dict = {}
-            if sender_id:
-                try:
-                    sender = await safe_call(self.client.get_entity(sender_id), "fetch_messages")
-                    sender_dict['user_id'] = sender_id
-                    sender_dict['first_name'] = sender.first_name if sender.first_name else None
-                    sender_dict['last_name'] = sender.last_name if sender.last_name else None
-                    sender_dict['username'] = sender.username if sender.username else None
-
-                    avatar_path = os.path.join(self.avatar_folder, f"{sender_id}_{sender.first_name}.jpg")
-                    if sender.photo and not os.path.exists(avatar_path):
-                        await safe_call(self.client.download_profile_photo(sender, file=avatar_path))
-
-                    sender_dict['avatar'] = avatar_path if os.path.exists(avatar_path) else None
-                    sender_dict['is_bot'] = True if sender.bot else False
-                except Exception as e:
-                    print(f"An unexpected error occurred during fetching messages: {e}")
-            else:
-                sender_dict['user_id'] = None
-                sender_dict['first_name'] = None
-                sender_dict['last_name'] = None
-                sender_dict['username'] = None
-                sender_dict['avatar'] = None
-                sender_dict['is_bot'] = None
-            msg_data['sender'] = sender_dict
-
-            print("Searching for replies to message..")
-            if message.replies and await self.get_chat_type() in ["Channel admin", "Channel user"]:
-                print("Found replies, trying to fetch them.")
-                async for comment in self.client.iter_messages(self.target, reply_to=message.id):
-                    comment_data = {
-                        'id': comment.id,
-                        'text': comment.text,
-                        'date': comment.date.isoformat(),
-                        'changed_at': comment.edit_date.isoformat() if comment.edit_date and comment.edit_date != comment.date else None,
-                        'user_id': comment.from_id.user_id if comment.from_id else None
-                    }
-                    comments.append(comment_data)
-
-                    msg_data['comments'] = comments if comments else None
-            else:
-                print("No replies found for message.")
-
-            msg_data['media'] = None
-
-            if message.media:
-                print(f"Media found. Trying to save it.")
-
-                formatted_date = message.date.strftime("%Y-%m-%d_%H-%M-%S")
-
-                if isinstance(message.media, MessageMediaPhoto):
-                    file_path = await safe_call(message.download_media(
-                        file=f"{self.target}/media/{formatted_date}_{message.id}.jpg"), "fetch_messages")
-                    msg_data['media'] = file_path if file_path else None
-                elif isinstance(message.media, MessageMediaDocument):
+                sender_dict = {}
+                if sender_id:
                     try:
-                        guessed_mime = mimetypes.guess_extension(message.media.document.mime_type)
-                        print(f"Guessed mime: {guessed_mime}")
-                        file_path = await safe_call(message.download_media(
-                            file=f"{self.target}/media/{formatted_date}_{message.id}{guessed_mime}"), "fetch_messages")
+                        sender = await safe_call(self.client.get_entity(sender_id), "fetch_messages")
+                        sender_dict['user_id'] = sender_id
+                        sender_dict['first_name'] = sender.first_name if sender.first_name else None
+                        sender_dict['last_name'] = sender.last_name if sender.last_name else None
+                        sender_dict['username'] = sender.username if sender.username else None
+
+                        avatar_path = os.path.join(self.avatar_folder, f"{sender_id}_{sender.first_name}.jpg")
+                        if sender.photo and not os.path.exists(avatar_path):
+                            await safe_call(self.client.download_profile_photo(sender, file=avatar_path))
+
+                        sender_dict['avatar'] = avatar_path if os.path.exists(avatar_path) else None
+                        sender_dict['is_bot'] = True if sender.bot else False
                     except Exception as e:
+                        logging.warn("An unexpected error occurred during fetching messages: {e}")
+                else:
+                    sender_dict['user_id'] = None
+                    sender_dict['first_name'] = None
+                    sender_dict['last_name'] = None
+                    sender_dict['username'] = None
+                    sender_dict['avatar'] = None
+                    sender_dict['is_bot'] = None
+                msg_data['sender'] = sender_dict
+
+                logging.debug("Searching for replies to message..")
+                if message.replies and await self.get_chat_type() in ["Channel admin", "Channel user"]:
+                    logging.debug("Found replies, trying to fetch them.")
+                    async for comment in self.client.iter_messages(self.target, reply_to=message.id):
+                        comment_data = {
+                            'id': comment.id,
+                            'text': comment.text,
+                            'date': comment.date.isoformat(),
+                            'changed_at': comment.edit_date.isoformat() if comment.edit_date and comment.edit_date != comment.date else None,
+                            'user_id': comment.from_id.user_id if comment.from_id else None
+                        }
+                        comments.append(comment_data)
+
+                        msg_data['comments'] = comments if comments else None
+                else:
+                    logging.debug("No replies found for message.")
+
+                msg_data['media'] = None
+
+                if message.media:
+                    logging.debug(f"Media found. Trying to save it.")
+
+                    formatted_date = message.date.strftime("%Y-%m-%d_%H-%M-%S")
+
+                    if isinstance(message.media, MessageMediaPhoto):
                         file_path = await safe_call(message.download_media(
-                            file=f"{self.target}/media/{formatted_date}_{message.id}.file"), "fetch_messages")
-                        print(f"[ERROR] Error occurred during guessing mime type extension: {e}")
-                    msg_data['media'] = file_path if file_path else None
-                print("Media was saved successfully\n")
+                            file=f"{self.target}/media/{formatted_date}_{message.id}.jpg"), "fetch_messages")
+                        msg_data['media'] = file_path if file_path else None
+                    elif isinstance(message.media, MessageMediaDocument):
+                        try:
+                            guessed_mime = mimetypes.guess_extension(message.media.document.mime_type)
+                            logging.debug(f"Guessed mime: {guessed_mime}")
+                            file_path = await safe_call(message.download_media(
+                                file=f"{self.target}/media/{formatted_date}_{message.id}{guessed_mime}"), "fetch_messages")
+                        except Exception as e:
+                            file_path = await safe_call(message.download_media(
+                                file=f"{self.target}/media/{formatted_date}_{message.id}.file"), "fetch_messages")
+                            logging.warning(f"[ERROR] Error occurred during guessing mime type extension: {e}")
+                        msg_data['media'] = file_path if file_path else None
+                    logging.debug("Media was saved successfully\n")
+            except Exception as e:
+                logging.warning("Fetch_messages failed.\n{Exception}\nTrying to save data...")
+                break
 
             msg_data['geo'] = None
 
@@ -311,16 +359,23 @@ class Scraper:
         res = {"target": target_info, "messages": messages}
 
         if Config.save_to_db:
-            print("All result saved to configured DB")
-
+            logging.info("All result saved to configured DB")
+        logging.info("Finished fetching messages")
         return res
 
-    async def get_members(self) -> dict:
+    async def get_members(self) -> dict | None:
         """Try to fetch a list with all group members, if possible.\n
         Group members can be fetched in channels only if our user is admin
         **Usage:** bot.get_members()
         :returns: dict with group/channel participants
         """
+        logging.info("Started fetching group members")
+
+        if Config.stop_event.is_set():
+            logging.info("Interrupted by user")
+            print("Program stopped by user.")
+            return None
+
         users = []
         users_dict = {"target": self.target}
         users_list = []
@@ -330,8 +385,10 @@ class Scraper:
         if chat_type in ["Mega group", "Channel admin", "Chat group"]:
             users = await safe_call(self.client.get_participants(self.target), "get_members")
         elif chat_type == "Channel user":
+            logging.info("Cannot fetch members. You're not an admin")
             print("Cannot fetch members. You're not an admin.")
         else:
+            logging.info("Cannot fetch members. Unknown chat_type.")
             print("Cannot fetch members. Unknown chat_type.")
 
         if users:
@@ -354,5 +411,7 @@ class Scraper:
                 users_list.append(user_data)
 
         users_dict["participants"] = users_list
+
+        logging.info("Finished fetching members")
 
         return users_dict
