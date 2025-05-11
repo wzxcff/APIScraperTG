@@ -18,6 +18,8 @@ class Config:
     max_attempts = 3
     stop_event = Event()
 
+    download_media = False # Turn this off if you need to download text only
+
     logging.basicConfig(
         filename="logs.log",
         encoding="utf-8",

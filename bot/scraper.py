@@ -306,7 +306,7 @@ class Scraper:
 
                 msg_data['media'] = None
 
-                if message.media:
+                if message.media and Config.download_media:
                     logging.debug(f"Media found. Trying to save it.")
 
                     formatted_date = message.date.strftime("%Y-%m-%d_%H-%M-%S")
