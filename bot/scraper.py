@@ -211,7 +211,7 @@ class Scraper:
             else:
                 user = await self.client.get_me()
                 try:
-                    permissions = await safe_call(self.client.get_permissions(self.target, user.id), "get_chat_type")
+                    permissions = await self.client.get_permissions(self.target, user.id), "get_chat_type"
                 except UserNotParticipantError:
                     logging.warning(f"User is not participant!")
                     return "User not participant"
@@ -350,6 +350,7 @@ class Scraper:
 
         if messages and Config.save_to_db:
             insert_message(messages, target_info["id"], conn)
+            messages.clear()
 
         res = {"target": target_info, "messages": messages}
 

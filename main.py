@@ -21,8 +21,8 @@ def ask_for_limit_n_offset():
 def menu():
     global target_channel, start_from_last_msg, specify_limit_offset
     target_channel = input("Enter channel username: ")
-    start_from_last_msg = True if input("Do you want to start from last scraped message? y/n: ") == "y" else False
-    specify_limit_offset = True if input("Do you want to specify limit and offset manually? y/n: ") == "y" else False
+    start_from_last_msg = True if input("Do you want to start from last scraped message? y/n: ").lower() == "y" else False
+    specify_limit_offset = True if input("Do you want to specify limit and offset manually? y/n: ").lower() == "y" else False
     if specify_limit_offset:
         ask_for_limit_n_offset()
 
