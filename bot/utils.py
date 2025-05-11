@@ -46,7 +46,8 @@ async def safe_call(coro, method_name="unknown"):
             print(f"[FloodWait] - [{method_name}] Too many requests sent! Waiting for {e.seconds} seconds...")
         except Exception as e:
             if attempts > max_attempts:
-                raise RuntimeError(f"Error during calling method \"{method_name}\". Program used all of {max_attempts} available attempts.")
+                print(f"Error during calling method \"{method_name}\". Program used all of {max_attempts} available attempts.")
+                return None
             print(f"[Exception] - [{method_name}] Unexpected exception occurred: {e}\nRetrying...")
             attempts += 1
 
