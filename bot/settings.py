@@ -19,6 +19,7 @@ class Config:
     stop_event = Event()
 
     download_media = True # Turn this off if you need to download text only
+    download_comments = True # Turn this off if you don't need to download comments (replies)
 
     logging.basicConfig(
         filename="logs.log",

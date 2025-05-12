@@ -288,7 +288,7 @@ class Scraper:
                 msg_data['sender'] = sender_dict
 
                 logging.debug("Searching for replies to message..")
-                if message.replies and await self.get_chat_type() in ["Channel admin", "Channel user"]:
+                if message.replies and await self.get_chat_type() in ["Channel admin", "Channel user"] and Config.download_comments:
                     logging.debug("Found replies, trying to fetch them.")
                     async for comment in self.client.iter_messages(self.target, reply_to=message.id):
                         comment_data = {
