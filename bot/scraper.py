@@ -211,7 +211,7 @@ class Scraper:
             else:
                 user = await self.client.get_me()
                 try:
-                    permissions = await self.client.get_permissions(self.target, user.id), "get_chat_type"
+                    permissions = await self.client.get_permissions(self.target, user.id)
                 except UserNotParticipantError:
                     logging.warning(f"User is not participant!")
                     return "User not participant"
