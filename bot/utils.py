@@ -1,7 +1,7 @@
 import json
 import time
 
-from .settings import Config
+from .settings import Config, logging
 from telethon.errors import FloodWaitError
 
 
@@ -19,16 +19,17 @@ def get_last_message_id(filename: str):
     Reads last saved message ID from messages.json file.\n
     :param filename: path to JSON file
     """
-    with open(filename, 'r', encoding='utf-8') as f:
-        data = dict(json.load(f))
-        try:
-            return data["messages"][0]["id"]
-        except KeyError:
-            print("[get_last_message_id] Couldn't find message ID in messages.json")
-            return None
-        except FileNotFoundError:
-            print("[get_last_message_id] File messages.json doesn't exist")
-            return None
+    try:
+        with open(filename, 'r', encoding='utf-8') as f:
+            data = dict(json.load(f))
+            try:
+                return data["messages"][0]["id"]
+            except KeyError:
+                logging.warning("[get_last_message_id] Couldn't find message ID in messages.json")
+                return 0
+    except FileNotFoundError:
+        logging.warning("[get_last_message_id] File messages.json doesn't exist")
+        return 0
 
 
 async def safe_call(coro, method_name="unknown"):

@@ -46,14 +46,15 @@ async def main():
     offset = 0
     limit = 100
 
-    threading.Thread(target=input_listener, daemon=True).start()
+    input_thread = threading.Thread(target=input_listener)
+    input_thread.start()
 
     if Config.stop_event.is_set():
         return
 
     if start_from_last_msg:
         offset = get_last_message_id(os.path.join(folders["jsons_folder"], "messages.json"))
-        print(f"Set offset of fetch_message to last message_id: {offset}")
+        logging.info(f"Set offset of fetch_message to last message_id: {offset}")
 
     if specify_limit_offset:
         if user_limit is not None:
@@ -74,6 +75,8 @@ async def main():
 
     for name, data in data_dict.items():
         dump_json(data, f"{folders['jsons_folder']}/{name}")
+
+    input_thread.join()
 
 if __name__ == "__main__":
     menu()
